@@ -6,6 +6,13 @@
         "title": "MEA Thailand Grid Tariffs",
         "description": "Automatically scrape electricity tariffs from the Metropolitan Electricity Authority website.",
         "data": {
+          "tariff": "Select Tariff Category"
+        }
+      },
+      "sub_tariff": {
+        "title": "MEA Thailand Grid Tariffs",
+        "description": "Select the specific rate you want to track.",
+        "data": {
           "sub_tariff": "Select Electricity Tariff Type"
         }
       }
@@ -15,12 +22,22 @@
     }
   },
   "selector": {
+    "tariff": {
+      "options": {
+        "residential": "Residential (Type 1)",
+        "business": "Small General Service (Type 2)"
+      }
+    },
     "sub_tariff": {
       "options": {
         "le150": "Type 1.1 < 150 Units",
         "gt150": "Type 1.2 > 150 Units",
         "tou_131": "Type 1.3.1 TOU (12-24 kV)",
-        "tou_132": "Type 1.3.2 TOU (Under 12 kV)"
+        "tou_132": "Type 1.3.2 TOU (Under 12 kV)",
+        "sb_211": "Type 2.1.1 (12-24 kV)",
+        "sb_212": "Type 2.1.2 (Under 12 kV)",
+        "sb_tou_221": "Type 2.2.1 TOU (12-24 kV)",
+        "sb_tou_222": "Type 2.2.2 TOU (Under 12 kV)"
       }
     }
   }

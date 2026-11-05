@@ -18,6 +18,10 @@ TARIFF_PAGES: dict[str, dict[str, str]] = {
         "name": "บ้านอยู่อาศัย (ประเภท 1)",
         "url": f"{BASE}/our-services/service-rates/other/D5xEaEwgU",
     },
+    "business": {
+        "name": "กิจการขนาดเล็ก (ประเภท 2)",
+        "url": f"{BASE}/our-services/service-rates/other/lhKD8oIlS",
+    },
 }
 
 FT_URLS: list[str] = [
@@ -34,7 +38,7 @@ CONF_SUB_TARIFF = "sub_tariff"
 SERVICE_REFRESH = "refresh"
 
 # --- Entity / Device naming ---------------------------------------------
-# ฐานของ entity_id ทุกตัวในระบบ (บ้านอยู่อาศัย ประเภท 1 เท่านั้นตอนนี้ จึง fix เป็น residential_1)
+# ฐานของ entity_id ทุกตัวในระบบ
 ENTITY_ID_BASE = "mea_thailand_grid_tariff"
 
 SUB_TARIFF_ID_SLUGS: dict[str, str] = {
@@ -42,11 +46,17 @@ SUB_TARIFF_ID_SLUGS: dict[str, str] = {
     "gt150": "type_1_2_greater_150",
     "tou_131": "type_1_3_1_tou_12_24",
     "tou_132": "type_1_3_2_tou_under_12",
+    "sb_211": "type_2_1_1_12_24",
+    "sb_212": "type_2_1_2_below_12",
+    "sb_tou_221": "type_2_2_1_tou_12_24",
+    "sb_tou_222": "type_2_2_2_tou_below_12",
 }
 
 # ชื่อ Config Entry (หัวข้อบนสุดใน Services) — คงที่ ไม่ผันตาม sub_tariff
 RESIDENTIAL_TITLE_TH = "MEA บ้านอยู่อาศัย (ประเภท 1)"
 RESIDENTIAL_TITLE_EN = "MEA Residential (Type 1)"
+BUSINESS_TITLE_TH = "MEA กิจการขนาดเล็ก (ประเภท 2)"
+BUSINESS_TITLE_EN = "MEA Small General Service (Type 2)"
 
 
 def _load_sub_tariff_labels(json_filename: str) -> dict[str, str]:
@@ -87,3 +97,8 @@ def sub_tariff_label(key: str, language: str | None = None) -> str:
 def residential_title(language: str | None = None) -> str:
     """ชื่อ Config Entry (หัวข้อบนสุดใน Services) ตามภาษาของระบบ HA."""
     return RESIDENTIAL_TITLE_TH if _is_thai(language) else RESIDENTIAL_TITLE_EN
+
+
+def business_title(language: str | None = None) -> str:
+    """ชื่อ Config Entry ประเภท 2 (หัวข้อบนสุดใน Services) ตามภาษาของระบบ HA."""
+    return BUSINESS_TITLE_TH if _is_thai(language) else BUSINESS_TITLE_EN

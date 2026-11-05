@@ -76,15 +76,62 @@ def _get_fallback_blocks(tariff_key: str) -> list[RateBlock]:
             )
         ]
 
+    # --- ประเภท 2 กิจการขนาดเล็ก (Small General Service) ---
+    if "sb_211" in key or "2.1.1" in key:
+        return [
+            RateBlock(
+                key="sb_211",
+                title="2.1.1 กิจการขนาดเล็ก แรงดัน 12 - 24 กิโลโวลต์",
+                tiers=[Tier(label="อัตราเดียว", start=None, end=None, rate=3.9086)],
+                service_charge=312.24,
+            )
+        ]
+
+    if "sb_212" in key or "2.1.2" in key:
+        return [
+            RateBlock(
+                key="sb_212",
+                title="2.1.2 กิจการขนาดเล็ก แรงดันต่ำกว่า 12 กิโลโวลต์",
+                tiers=[
+                    Tier(label="150 หน่วยแรก", start=1, end=150, rate=3.2484),
+                    Tier(label="250 หน่วยต่อไป", start=151, end=400, rate=4.2218),
+                    Tier(label="เกินกว่า 400 หน่วย", start=401, end=None, rate=4.4217),
+                ],
+                service_charge=33.29,
+            )
+        ]
+
+    if "sb_tou_221" in key or "2.2.1" in key:
+        return [
+            RateBlock(
+                key="sb_tou_221",
+                title="2.2.1 TOU กิจการขนาดเล็ก แรงดัน 12 - 24 กิโลโวลต์",
+                on_peak=5.1135,
+                off_peak=2.6037,
+                service_charge=312.24,
+            )
+        ]
+
+    if "sb_tou_222" in key or "2.2.2" in key:
+        return [
+            RateBlock(
+                key="sb_tou_222",
+                title="2.2.2 TOU กิจการขนาดเล็ก แรงดันต่ำกว่า 12 กิโลโวลต์",
+                on_peak=5.7982,
+                off_peak=2.6369,
+                service_charge=33.29,
+            )
+        ]
+
     # Default / Fallback สำหรับ 1.2 (gt150)
     return [
         RateBlock(
             key="gt150",
             title="1.2 บ้านอยู่อาศัย (เกิน 150 หน่วย)",
             tiers=[
-                Tier(label="1 - 200 หน่วย", start=1, end=200, rate=3.2484),
-                Tier(label="201 - 400 หน่วย", start=201, end=400, rate=4.2218),
-                Tier(label="401 หน่วยเป็นต้นไป", start=401, end=None, rate=4.4217),
+                Tier(label="1 - 200 หน่วย", start=1, end=200, rate=3.0000),
+                Tier(label="201 - 400 หน่วย", start=201, end=400, rate=4.1584),
+                Tier(label="401 หน่วยเป็นต้นไป", start=401, end=None, rate=4.3583),
             ],
             service_charge=24.62,
         )

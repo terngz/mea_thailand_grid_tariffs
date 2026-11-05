@@ -27,6 +27,26 @@ _LOGGER = logging.getLogger(__name__)
 CURRENCY = "THB"
 
 
+def _tariff_type_name(block_key: str) -> str:
+    """ชื่อประเภท tariff แบบอ่านออก (ใช้แทน prefix 'Residential' ที่ hardcode ไว้เดิม)."""
+    return "Small General Service" if str(block_key).startswith("sb") else "Residential"
+
+
+def _sub_code_label(block_key: str) -> str:
+    """แปลง block key เป็นหมายเลขอัตราใช้แสดงผล (เช่น sb_212 -> '2.1.2 (Under 12 kV)')."""
+    labels = {
+        "le150": "1.1",
+        "gt150": "1.2",
+        "tou_131": "1.3.1 (12-24 kV)",
+        "tou_132": "1.3.2 (Under 12 kV)",
+        "sb_211": "2.1.1 (12-24 kV)",
+        "sb_212": "2.1.2 (Under 12 kV)",
+        "sb_tou_221": "2.2.1 TOU (12-24 kV)",
+        "sb_tou_222": "2.2.2 TOU (Under 12 kV)",
+    }
+    return labels.get(str(block_key), str(block_key))
+
+
 def load_holidays(folder_path: str) -> set[str]:
     """โหลดรายการวันหยุดจากไฟล์ holidays.txt (YYYY-MM-DD)."""
     file_path = os.path.join(folder_path, "holidays.txt")
@@ -57,19 +77,20 @@ async def async_setup_entry(
         for block in coordinator.data["blocks"]:
             b_key = str(getattr(block, "key", "")).strip().lower()
 
+            # จับคู่ block key กับ sub_tariff ที่เลือกไว้ — ใช้ exact match เป็นหลัก
+            # (รองรับทั้ง Type 1 บ้านอยู่อาศัย และ Type 2 กิจการขนาดเล็ก)
             match = False
             if not target_sub:
                 match = True
-            elif ("gt150" in target_sub or "1.2" in target_sub) and "gt150" in b_key:
+            elif target_sub == b_key:
                 match = True
-            elif ("le150" in target_sub or "1.1" in target_sub) and "le150" in b_key:
-                match = True
-            elif ("131" in target_sub or "tou_131" in target_sub) and ("131" in b_key or "tou_131" in b_key):
-                match = True
-            elif ("132" in target_sub or "tou_132" in target_sub) and ("132" in b_key or "tou_132" in b_key):
-                match = True
-            elif target_sub in b_key or b_key in target_sub:
-                match = True
+            else:
+                # กัน sub_tariff ของ Type 2 ไม่ให้ไปจับคู่กับ block ของ Type 1 โดยบังเอิญ
+                # เช่น "sb_tou_222" ไม่ควร match "tou_132" ผ่าน substring "tou"
+                t2 = target_sub.startswith("sb")
+                b2 = b_key.startswith("sb")
+                if t2 == b2:
+                    match = target_sub in b_key or b_key in target_sub
 
             if not match:
                 continue
@@ -145,8 +166,8 @@ class MeaRateSensor(MeaBase):
         self._key, self._index = block_key, index
         self._attr_unique_id = f"{entry.entry_id}_{block_key}_tier{index}"
 
-        sub_code = "1_1" if "le150" in block_key else ("1_2" if "gt150" in block_key else block_key)
-        self._sub_code_label = "1.1" if sub_code == "1_1" else ("1.2" if sub_code == "1_2" else sub_code)
+        self._type_name = _tariff_type_name(block_key)
+        self._sub_code_label = _sub_code_label(block_key)
 
         b = self._block(block_key)
         range_str = f"tier{index}"
@@ -165,9 +186,9 @@ class MeaRateSensor(MeaBase):
             t = b.tiers[self._index - 1]
             if getattr(t, "start", None) is not None:
                 end_str = f"{int(t.end)}" if getattr(t, "end", None) is not None else "onwards"
-                return f"Residential {self._sub_code_label} Tier {self._index} ({int(t.start)}-{end_str} kWh)"
-            return f"Residential {self._sub_code_label} Tier {self._index} ({getattr(t, 'label', '')})"
-        return f"Residential {self._sub_code_label} Tier {self._index}"
+                return f"{self._type_name} {self._sub_code_label} Tier {self._index} ({int(t.start)}-{end_str} kWh)"
+            return f"{self._type_name} {self._sub_code_label} Tier {self._index} ({getattr(t, 'label', '')})"
+        return f"{self._type_name} {self._sub_code_label} Tier {self._index}"
 
     @property
     def native_value(self):
@@ -189,14 +210,11 @@ class MeaTouRateSensor(MeaBase):
         self._key, self._peak_type = block_key, peak_type
         self._attr_unique_id = f"{entry.entry_id}_{block_key}_{peak_type}"
 
-        b_key = str(block_key)
-        if "131" in b_key or "tou_131" in b_key:
-            self._label = "1.3.1 (12-24 kV)"
-        else:
-            self._label = "1.3.2 (Under 12 kV)"
+        self._type_name = _tariff_type_name(block_key)
+        self._label = _sub_code_label(block_key)
 
         self.entity_id = f"sensor.{ENTITY_ID_BASE}_{self._id_slug}_{peak_type}"
-        self._attr_name = f"Residential {self._label} {peak_type.replace('_', ' ').title()}"
+        self._attr_name = f"{self._type_name} {self._label} {peak_type.replace('_', ' ').title()}"
 
     @property
     def native_value(self):
@@ -255,20 +273,11 @@ class MeaServiceChargeSensor(MeaBase):
         self._key = block_key
         self._attr_unique_id = f"{entry.entry_id}_{block_key}_service_charge"
 
-        b_key = str(block_key)
-        if "le150" in b_key:
-            label = "1.1"
-        elif "gt150" in b_key:
-            label = "1.2"
-        elif "131" in b_key or "tou_131" in b_key:
-            label = "1.3.1 (12-24 kV)"
-        elif "132" in b_key or "tou_132" in b_key:
-            label = "1.3.2 (Under 12 kV)"
-        else:
-            label = b_key
+        self._type_name = _tariff_type_name(block_key)
+        label = _sub_code_label(block_key)
 
         self.entity_id = f"sensor.{ENTITY_ID_BASE}_{self._id_slug}_service_charge"
-        self._attr_name = f"Residential {label} Service Charge"
+        self._attr_name = f"{self._type_name} {label} Service Charge"
 
     @property
     def native_value(self):

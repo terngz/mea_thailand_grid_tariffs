@@ -8,15 +8,20 @@ Custom Component for Home Assistant to parse real-time electricity tariff rates 
 
 ## Features
 
-* **Complete MEA Residential Type 1 (Household) Tariffs:**
+* **MEA Type 1 (Residential / Household) Tariffs:**
   * **Rate 1.1:** Household consumption < 150 kWh (Tier 1–5 breakdown)
   * **Rate 1.2:** Household consumption > 150 kWh (Tier 1–3 breakdown)
   * **Rate 1.3.1:** TOU Voltage 12–24 kV (On-Peak / Off-Peak)
   * **Rate 1.3.2:** TOU Voltage < 12 kV (On-Peak / Off-Peak)
+* **MEA Type 2 (Small General Service / Business) Tariffs:**
+  * **Rate 2.1.1:** Small business 12–24 kV (flat rate)
+  * **Rate 2.1.2:** Small business < 12 kV (Tier 1–3 breakdown)
+  * **Rate 2.2.1:** TOU 12–24 kV (On-Peak / Off-Peak)
+  * **Rate 2.2.2:** TOU < 12 kV (On-Peak / Off-Peak)
 * **Automatic Ft Tracking:** Fetches current Ft values with satang-per-unit state attributes.
 * **Service Charge Tracking:** Dedicated monthly base service charge entity per tariff selection.
 * **TOU Status Tracking:** Status sensor indicating current On-Peak / Off-Peak period (accounting for weekends and public holidays, customizable via `holidays.txt`).
-* **UI Config Flow:** Easy configuration directly through the Home Assistant interface.
+* **UI Config Flow:** Easy configuration directly through the Home Assistant interface, with a first step to choose the tariff category (Type 1 Residential or Type 2 Small General Service).
 
 ---
 
@@ -85,6 +90,48 @@ The entities generated depend on the sub-tariff category selected during integra
 
 </details>
 
+<details>
+<summary><b>Type 2.1.1 — Small Business 12–24 kV (sb_211)</b></summary>
+
+* `sensor.mea_thailand_grid_tariff_type_2_1_1_12_24_tier1`
+* `sensor.mea_thailand_grid_tariff_type_2_1_1_12_24_service_charge`
+* `sensor.mea_thailand_grid_tariff_type_2_1_1_12_24_ft_rate`
+
+</details>
+
+<details>
+<summary><b>Type 2.1.2 — Small Business < 12 kV (sb_212)</b></summary>
+
+* `sensor.mea_thailand_grid_tariff_type_2_1_2_below_12_tier1_1_150`
+* `sensor.mea_thailand_grid_tariff_type_2_1_2_below_12_tier2_151_400`
+* `sensor.mea_thailand_grid_tariff_type_2_1_2_below_12_tier3_401_onward`
+* `sensor.mea_thailand_grid_tariff_type_2_1_2_below_12_service_charge`
+* `sensor.mea_thailand_grid_tariff_type_2_1_2_below_12_ft_rate`
+
+</details>
+
+<details>
+<summary><b>Type 2.2.1 — TOU Voltage 12–24 kV (sb_tou_221)</b></summary>
+
+* `sensor.mea_thailand_grid_tariff_type_2_2_1_tou_12_24_on_peak`
+* `sensor.mea_thailand_grid_tariff_type_2_2_1_tou_12_24_off_peak`
+* `sensor.mea_thailand_grid_tariff_type_2_2_1_tou_12_24_tou_time_status`
+* `sensor.mea_thailand_grid_tariff_type_2_2_1_tou_12_24_service_charge`
+* `sensor.mea_thailand_grid_tariff_type_2_2_1_tou_12_24_ft_rate`
+
+</details>
+
+<details>
+<summary><b>Type 2.2.2 — TOU Voltage < 12 kV (sb_tou_222)</b></summary>
+
+* `sensor.mea_thailand_grid_tariff_type_2_2_2_tou_below_12_on_peak`
+* `sensor.mea_thailand_grid_tariff_type_2_2_2_tou_below_12_off_peak`
+* `sensor.mea_thailand_grid_tariff_type_2_2_2_tou_below_12_tou_time_status`
+* `sensor.mea_thailand_grid_tariff_type_2_2_2_tou_below_12_service_charge`
+* `sensor.mea_thailand_grid_tariff_type_2_2_2_tou_below_12_ft_rate`
+
+</details>
+
 ---
 
 ## Installation
@@ -109,8 +156,11 @@ The entities generated depend on the sub-tariff category selected during integra
 1. Navigate to **Settings** -> **Devices & Services**.
 2. Click **Add Integration**.
 3. Search for `MEA Thailand Grid Tariffs`.
-4. Select your household tariff type (e.g. Type 1.1 < 150 Units or Type 1.2 > 150 Units)
-5. Click **Submit**.
+4. Choose the **tariff category**:
+   * **Residential (Type 1)** — household tariffs
+   * **Small General Service (Type 2)** — small business tariffs
+5. Then select the specific rate you want to track (e.g. Type 1.1 < 150 Units, Type 2.1.2 < 12 kV, Type 2.2.1 TOU, etc.)
+6. Click **Submit**.
 
 ---
 

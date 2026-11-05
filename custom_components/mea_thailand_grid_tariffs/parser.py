@@ -135,8 +135,13 @@ class RateBlock:
 def parse_tariff_page(html: str) -> list[RateBlock]:
     blocks: list[RateBlock] = []
 
-    # --- Step 1: Direct Regex ดึงตาราง TOU (1.3.1 และ 1.3.2) แน่นอน 100% ---
     clean_html = re.sub(r"\s+", " ", html)
+
+    # --- ตรวจจับประเภทจากเนื้อหาของหน้า (ปลอดภัยกว่า: ไม่อิงไฟล์ URL) ---
+    if "2.1.1" in clean_html or "2.2.1" in clean_html:
+        return _parse_type2(html)
+
+    # --- Step 1: Direct Regex ดึงตาราง TOU (1.3.1 และ 1.3.2) แน่นอน 100% ---
 
     # ค้นหาแถว 1.3.1
     m_131 = re.search(r"1\.3\.1[^\d]*12\s*[\-–—]\s*24.*?(\d+\.\d+).*?(\d+\.\d+).*?(\d+\.\d+)", clean_html)
@@ -208,6 +213,103 @@ def parse_tariff_page(html: str) -> list[RateBlock]:
         if block.tiers or block.service_charge is not None:
             blocks.append(block)
 
+    return blocks
+
+
+def _parse_type2(html: str) -> list[RateBlock]:
+    """Parse หน้าประเภท 2 (กิจการขนาดเล็ก) — ตารางปกติ 2.1.x + ตาราง TOU 2.2.x."""
+    blocks: list[RateBlock] = []
+
+    collector = _TableCollector()
+    try:
+        collector.feed(html)
+        collector.close()
+    except Exception:
+        return blocks
+
+    for table in collector.tables:
+        current: RateBlock | None = None  # block ปกติที่กำลังเติม tier/service
+        for row in table["rows"]:
+            cells = [c for c in row if c]
+            if not cells:
+                continue
+            label = cells[0]
+            values = [_f(c) for c in cells[1:]]
+
+            # --- ตาราง TOU 2.2.1 / 2.2.2 (4 คอลัมน์) ---
+            if "2.2.1" in label:
+                b = RateBlock(
+                    key="sb_tou_221",
+                    title="2.2.1 กิจการขนาดเล็ก แรงดัน 12 – 24 กิโลโวลต์",
+                    on_peak=values[0] if len(values) > 0 else None,
+                    off_peak=values[1] if len(values) > 1 else None,
+                    service_charge=values[2] if len(values) > 2 else None,
+                )
+                blocks.append(b)
+                current = b
+                continue
+            if "2.2.2" in label:
+                b = RateBlock(
+                    key="sb_tou_222",
+                    title="2.2.2 กิจการขนาดเล็ก แรงดันต่ำกว่า 12 กิโลโวลต์",
+                    on_peak=values[0] if len(values) > 0 else None,
+                    off_peak=values[1] if len(values) > 1 else None,
+                    service_charge=values[2] if len(values) > 2 else None,
+                )
+                blocks.append(b)
+                current = b
+                continue
+
+            # --- ตารางปกติ 2.1.1 / 2.1.2 ---
+            if "2.1.1" in label:
+                b = RateBlock(
+                    key="sb_211",
+                    title="2.1.1 กิจการขนาดเล็ก แรงดัน 12 - 24 กิโลโวลต์",
+                    service_charge=_f(cells[-1]),
+                )
+                if len(values) > 0 and values[0] is not None:
+                    b.tiers.append(
+                        Tier(label="อัตราเดียว", start=None, end=None, rate=values[0])
+                    )
+                blocks.append(b)
+                current = b
+                continue
+            if "2.1.2" in label:
+                b = RateBlock(
+                    key="sb_212",
+                    title="2.1.2 กิจการขนาดเล็ก แรงดันต่ำกว่า 12 กิโลโวลต์",
+                    service_charge=_f(cells[-1]),
+                )
+                blocks.append(b)
+                current = b
+                continue
+
+            # --- แถว tier ในตารางปกติ 2.1.x (รองรับไทยและอังกฤษ) ---
+            if current is not None and current.key not in ("sb_tou_221", "sb_tou_222"):
+                rate = values[-1] if values and values[-1] is not None else None
+                if rate is not None:
+                    tier = Tier(label=label, rate=rate)
+                    # ไทย: "150 หน่วยแรก (หน่วยที่ 1 – 150)"
+                    if (m := RANGE.search(label)):
+                        tier.start = int(m.group(1).replace(",", ""))
+                        tier.end = int(m.group(2).replace(",", ""))
+                    elif (m := RANGE_OPEN.search(label)):
+                        tier.start, tier.end = (
+                            int(m.group(1).replace(",", "")),
+                            None,
+                        )
+                    # อังกฤษ: "First 150 kWh (1st - 150th)" / "Over 400 kWh"
+                    elif (m := re.search(r"\((\d{1,3})(?:st|nd|rd|th)\s*[–\-—]\s*(\d{1,3})(?:st|nd|rd|th)\)", label)):
+                        tier.start = int(m.group(1))
+                        tier.end = int(m.group(2))
+                    elif (m := re.search(r"\(up from (\d{1,3})(?:st|nd|rd|th)\)", label)):
+                        tier.start = int(m.group(1))
+                        tier.end = None
+                    # ยอมรับทุกรายการที่มีอัตรา (อยู่ในกรอบของ block 2.1.x อยู่แล้ว)
+                    current.tiers.append(tier)
+
+    # ปรับ service_charge ของ 2.1.1 ให้ถูกต้อง (ไปอยู่บน block 2.1.1 ไม่ใช่ 2.1.2)
+    # — ด้านบนเราจัดการในแต่ละแถวแล้ว
     return blocks
 
 
