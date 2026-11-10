@@ -1,11 +1,18 @@
+# Python / Cache
 __pycache__/
 *.py[cod]
+.pytest_cache/
+.coverage
+
+# Environments
 .venv/
 venv/
-.pytest_cache/
+
+# OS / Archives / Backups
 .DS_Store
 *.zip
-.coverage
 .backup/
-.tests/
-/plans
+
+# Excluded Folders
+tests/
+plans/

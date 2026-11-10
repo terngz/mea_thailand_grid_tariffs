@@ -178,10 +178,10 @@ class MeaBase(CoordinatorEntity[MeaTariffCoordinator], SensorEntity):
 
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, entry.entry_id)},
-            manufacturer="@terngz (Community Integration)",
-            model=f"{INTEGRATION_NAME} — Unofficial Web Scraper Sensor for MEA Tariffs",
+            manufacturer="@terngz",
+            model=f"{INTEGRATION_NAME} — MEA Thailand Grid Tariffs",
             name=device_name,
-            configuration_url="https://github.com/terngz/mea-thailand_grid_tariffs",
+            configuration_url="https://github.com/terngz/mea_thailand_grid_tariffs",
         )
 
     def _block(self, key: str):
