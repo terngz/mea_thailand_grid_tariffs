@@ -1,7 +1,7 @@
 """Sensor platform สำหรับ MEA Thailand Grid Tariffs."""
 from __future__ import annotations
 
-from datetime import time
+from datetime import time, timedelta
 import logging
 import os
 
@@ -10,6 +10,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.event import async_track_point_in_time
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 import homeassistant.util.dt as dt_util
 
@@ -63,6 +64,43 @@ def load_holidays(folder_path: str) -> set[str]:
     return holidays
 
 
+def _tou_status_at(now, holidays: set[str]) -> str:
+    """Return the TOU On/Off-Peak status at a given local datetime.
+
+    ใช้ datetime object (ไม่ใช่ฟังก์ชันจาก HA) เพื่อให้ทดสอบได้ด้วย freezegun."""
+    date_str = now.strftime("%Y-%m-%d")
+
+    # 1. เช็กวันหยุดราชการจากไฟล์
+    if date_str in holidays:
+        return "Off Peak"
+
+    # 2. เช็กวันเสาร์ (5) / อาทิตย์ (6)
+    if now.weekday() in (5, 6):
+        return "Off Peak"
+
+    # 3. เช็กเวลา จันทร์ - ศุกร์ (09:00 - 22:00 น. คือ On Peak)
+    start_peak = time(9, 0, 0)
+    end_peak = time(22, 0, 0)
+    current_time = now.time()
+
+    if start_peak <= current_time < end_peak:
+        return "On Peak"
+
+    return "Off Peak"
+
+
+def _day_type_at(now, holidays: set[str]) -> str:
+    """Return the TOU day type: Holiday, Weekend, or Weekday.
+
+    ลำดับความสำคัญเหมือน _tou_status_at (Holiday > Weekend > Weekday)."""
+    date_str = now.strftime("%Y-%m-%d")
+    if date_str in holidays:
+        return "Holiday"
+    if now.weekday() in (5, 6):
+        return "Weekend"
+    return "Weekday"
+
+
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, add_entities: AddEntitiesCallback
 ) -> None:
@@ -109,6 +147,7 @@ async def async_setup_entry(
             # เพิ่มเฉพาะ Sensor บอกสถานะช่วงเวลา TOU เมื่อเลือกอัตรา 1.3.x
             if "131" in target_sub or "132" in target_sub or "tou" in b_key:
                 entities.append(MeaTouStatusSensor(coordinator, entry, block.key, integration_folder))
+                entities.append(MeaTouDayTypeSensor(coordinator, entry, block.key, integration_folder))
 
             # 3. ค่าบริการ
             if getattr(block, "service_charge", None) is not None:
@@ -224,42 +263,106 @@ class MeaTouRateSensor(MeaBase):
         return getattr(b, self._peak_type, None)
 
 
-class MeaTouStatusSensor(MeaBase):
-    """Sensor บอกสถานะช่วงเวลา TOU (On Peak / Off Peak)."""
+class MeaTouTimeBase(MeaBase):
+    """Base class สำหรับ sensor ที่ขึ้นกับช่วงเวลา TOU (Status / Day Type).
+
+    ดูแลการ schedule ให้รีเฟรชเองตามเวลาจริง (09:00 / 22:00 / เที่ยงคืน) โดยไม่ต้องพึ่ง
+    รอบสแกนของ coordinator (ซึ่งถี่แค่ทุก 90 วัน) — subclass ต้อง implement _value_at()."""
 
     _attr_icon = "mdi:clock-check-outline"
 
-    def __init__(self, coordinator: MeaTariffCoordinator, entry: ConfigEntry, block_key: str, folder_path: str) -> None:
+    def __init__(self, coordinator: MeaTariffCoordinator, entry: ConfigEntry, block_key: str, folder_path: str,
+                 unique_suffix: str, entity_suffix: str, name: str) -> None:
         super().__init__(coordinator, entry)
         self._key = block_key
         self._folder_path = folder_path
-        self._attr_unique_id = f"{entry.entry_id}_{block_key}_tou_time_status"
-        self.entity_id = f"sensor.{ENTITY_ID_BASE}_{self._id_slug}_tou_time_status"
-        self._attr_name = "TOU Time Status"
+        self._attr_unique_id = f"{entry.entry_id}_{block_key}_{unique_suffix}"
+        self.entity_id = f"sensor.{ENTITY_ID_BASE}_{self._id_slug}_{entity_suffix}"
+        self._attr_name = name
+        self._unsub_timer = None
+
+    def _value_at(self, now, holidays: set[str]) -> str:
+        raise NotImplementedError
 
     @property
     def native_value(self) -> str:
         now = dt_util.now()
-        date_str = now.strftime("%Y-%m-%d")
-
-        # 1. เช็กวันหยุดราชการจากไฟล์
         holidays = load_holidays(self._folder_path)
-        if date_str in holidays:
-            return "Off Peak"
+        return self._value_at(now, holidays)
 
-        # 2. เช็กวันเสาร์ (5) / อาทิตย์ (6)
-        if now.weekday() in (5, 6):
-            return "Off Peak"
+    def _next_change(self, now):
+        """Next local datetime at which the answer can change.
 
-        # 3. เช็กเวลา จันทร์ - ศุกร์ (09:00 - 22:00 น. คือ On Peak)
-        start_peak = time(9, 0, 0)
-        end_peak = time(22, 0, 0)
-        current_time = now.time()
+        จุดที่เป็นไปได้ที่ค่าจะเปลี่ยน: 09:00, 22:00 (วันนี้/พรุ่งนี้) และเที่ยงคืน
+        (สำคัญสำหรับวันหยุด/เสาร์-อาทิตย์เปลี่ยนเป็นวันทำงาน)."""
+        candidates = []
+        for hour in (9, 22):
+            for day_offset in (0, 1):
+                candidate = (
+                    now.replace(hour=hour, minute=0, second=0, microsecond=0)
+                    + timedelta(days=day_offset)
+                )
+                if candidate > now:
+                    candidates.append(candidate)
+        midnight = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+        candidates.append(midnight)
+        return min(candidates)
 
-        if start_peak <= current_time < end_peak:
-            return "On Peak"
+    def _remove_timer(self) -> None:
+        if self._unsub_timer is not None:
+            self._unsub_timer()
+            self._unsub_timer = None
 
-        return "Off Peak"
+    def _schedule_next(self) -> None:
+        self._remove_timer()
+        next_time = self._next_change(dt_util.now())
+        self._unsub_timer = async_track_point_in_time(
+            self.hass, self._async_refresh, next_time
+        )
+        _LOGGER.debug(
+            "%s: next TOU refresh scheduled at %s",
+            self.entity_id, next_time,
+        )
+
+    async def _async_refresh(self, _now) -> None:
+        self.async_write_ha_state()
+        self._schedule_next()
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self._schedule_next()
+
+    async def async_will_remove_from_hass(self) -> None:
+        self._remove_timer()
+        await super().async_will_remove_from_hass()
+
+
+class MeaTouStatusSensor(MeaTouTimeBase):
+    """Sensor บอกสถานะช่วงเวลา TOU (On Peak / Off Peak)."""
+
+    def __init__(self, coordinator: MeaTariffCoordinator, entry: ConfigEntry, block_key: str, folder_path: str) -> None:
+        super().__init__(
+            coordinator, entry, block_key, folder_path,
+            unique_suffix="tou_time_status", entity_suffix="tou_time_status",
+            name="TOU Time Status",
+        )
+
+    def _value_at(self, now, holidays: set[str]) -> str:
+        return _tou_status_at(now, holidays)
+
+
+class MeaTouDayTypeSensor(MeaTouTimeBase):
+    """Sensor บอกประเภทวัน TOU (Holiday / Weekend / Weekday)."""
+
+    def __init__(self, coordinator: MeaTariffCoordinator, entry: ConfigEntry, block_key: str, folder_path: str) -> None:
+        super().__init__(
+            coordinator, entry, block_key, folder_path,
+            unique_suffix="tou_day_type", entity_suffix="tou_day_type",
+            name="TOU Day Type",
+        )
+
+    def _value_at(self, now, holidays: set[str]) -> str:
+        return _day_type_at(now, holidays)
 
 
 class MeaServiceChargeSensor(MeaBase):

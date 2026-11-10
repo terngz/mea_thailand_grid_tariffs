@@ -39,6 +39,7 @@ The entities generated depend on the sub-tariff category selected during integra
 | **On Peak Rate** | `sensor.mea_thailand_grid_tariff_<slug>_on_peak` | `THB/kWh` | TOU peak electricity rate |
 | **Off Peak Rate** | `sensor.mea_thailand_grid_tariff_<slug>_off_peak` | `THB/kWh` | TOU off-peak electricity rate |
 | **TOU Status** | `sensor.mea_thailand_grid_tariff_<slug>_tou_time_status` | String | Current TOU period status |
+| **TOU Day Type** | `sensor.mea_thailand_grid_tariff_<slug>_tou_day_type` | String | TOU day classification (Holiday / Weekend / Weekday) |
 
 ---
 
@@ -74,6 +75,7 @@ The entities generated depend on the sub-tariff category selected during integra
 * `sensor.mea_thailand_grid_tariff_type_1_3_1_tou_12_24_on_peak`
 * `sensor.mea_thailand_grid_tariff_type_1_3_1_tou_12_24_off_peak`
 * `sensor.mea_thailand_grid_tariff_type_1_3_1_tou_12_24_tou_time_status`
+* `sensor.mea_thailand_grid_tariff_type_1_3_1_tou_12_24_tou_day_type`
 * `sensor.mea_thailand_grid_tariff_type_1_3_1_tou_12_24_service_charge`
 * `sensor.mea_thailand_grid_tariff_type_1_3_1_tou_12_24_ft_rate`
 
@@ -85,6 +87,7 @@ The entities generated depend on the sub-tariff category selected during integra
 * `sensor.mea_thailand_grid_tariff_type_1_3_2_tou_under_12_on_peak`
 * `sensor.mea_thailand_grid_tariff_type_1_3_2_tou_under_12_off_peak`
 * `sensor.mea_thailand_grid_tariff_type_1_3_2_tou_under_12_tou_time_status`
+* `sensor.mea_thailand_grid_tariff_type_1_3_2_tou_under_12_tou_day_type`
 * `sensor.mea_thailand_grid_tariff_type_1_3_2_tou_under_12_service_charge`
 * `sensor.mea_thailand_grid_tariff_type_1_3_2_tou_under_12_ft_rate`
 
@@ -116,6 +119,7 @@ The entities generated depend on the sub-tariff category selected during integra
 * `sensor.mea_thailand_grid_tariff_type_2_2_1_tou_12_24_on_peak`
 * `sensor.mea_thailand_grid_tariff_type_2_2_1_tou_12_24_off_peak`
 * `sensor.mea_thailand_grid_tariff_type_2_2_1_tou_12_24_tou_time_status`
+* `sensor.mea_thailand_grid_tariff_type_2_2_1_tou_12_24_tou_day_type`
 * `sensor.mea_thailand_grid_tariff_type_2_2_1_tou_12_24_service_charge`
 * `sensor.mea_thailand_grid_tariff_type_2_2_1_tou_12_24_ft_rate`
 
@@ -127,6 +131,7 @@ The entities generated depend on the sub-tariff category selected during integra
 * `sensor.mea_thailand_grid_tariff_type_2_2_2_tou_below_12_on_peak`
 * `sensor.mea_thailand_grid_tariff_type_2_2_2_tou_below_12_off_peak`
 * `sensor.mea_thailand_grid_tariff_type_2_2_2_tou_below_12_tou_time_status`
+* `sensor.mea_thailand_grid_tariff_type_2_2_2_tou_below_12_tou_day_type`
 * `sensor.mea_thailand_grid_tariff_type_2_2_2_tou_below_12_service_charge`
 * `sensor.mea_thailand_grid_tariff_type_2_2_2_tou_below_12_ft_rate`
 

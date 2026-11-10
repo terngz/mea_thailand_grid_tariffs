@@ -9,7 +9,7 @@ _LOGGER = logging.getLogger(__name__)
 
 DOMAIN = "mea_thailand_grid_tariffs"
 INTEGRATION_NAME = "MEA Thailand Grid Tariffs"
-DEFAULT_SCAN_INTERVAL_DAYS = 90
+DEFAULT_SCAN_INTERVAL_DAYS = 30
 
 BASE = "https://www.mea.or.th"
 
