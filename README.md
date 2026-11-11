@@ -4,6 +4,7 @@ Custom Component for Home Assistant to parse real-time electricity tariff rates 
 
 > **Disclaimer:** This is an unofficial, community-developed integration and is not affiliated with or endorsed by the Metropolitan Electricity Authority (MEA).
 
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/Y8I2292JV2)
 ---
 
 ## Features
